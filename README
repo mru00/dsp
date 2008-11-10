@@ -1,0 +1,90 @@
+* requires:
+
+ * sox for input preprocessing
+
+ * convolve
+
+ * hist
+  * fftw-dev for libfftw, librfftw
+  * glib-2.0
+  * gtk+-2.0
+
+ * the makefile currently uses pkg-config to determine the 
+   library paths for the libraries.
+   $ apt-get install pkg-path
+
+* input and output
+
+ * input must be 8bit signed single channel audio
+ * for convolve the sampling rate does not matter
+ * hist calculates absolute frequency with sampling rate fixed to 22050
+   but doesnt care if its not the actual sampling rate
+ * output is exaclty the same format
+
+
+* usage of hist
+
+ $ hist windowtitle
+   windowtitle will be used as title for the histogram
+
+   hist reads a block from stdin, performs a fft on it and displays the data
+   in a logarithmic display (x,y is logarithmic)
+
+* usage of convolve
+
+ $ convolve kernelfile
+
+   convolve first reads the kernel file. the kernel file must have a structure like (BNF):
+
+ 	file = { float }.
+   
+   the number of numbers in the file must match the current kernel size which is compiled
+   into the convolve.
+
+   example:
+
+	0.0 -2.0 0.0 2.0 0.0
+
+   which would be something like a highpass filter
+
+   then the convolve application reads samples from the input and convolves it
+   with the configured kernel. 
+
+   the convolved data is written to stdout.
+
+
+* synth
+
+  simple synth creating tones on a mathematical model of ck's
+
+* synth2
+  
+  simple synth reading ck's from a file
+
+* vocoder 
+
+  
+
+  removes frequencies from input
+
+* song
+
+
+  ./song | ./play.sh
+
+  plays the song in "song.txt" using something like in "synth"
+
+
+* midi
+
+  ./midi file.mid | ./play.sh
+
+* typical usage:
+
+sox mm.wav -1 -r 22050 -c 1 -t raw - | ./hist "orig" | ./convolve hp.kernel | ./hist "filt" | play -1 -r 22050 -c 1 -t raw -s  -
+
+mpg123 test.mp3 --wav mm.wav
+sox mm.wav -1 -r 22050 -c 1 -t raw mm.raw
+cat mm.raw | ./hist "orig" > /dev/null
+cat mm.raw | ./convolve hp.kernel  > hp.raw
+cat hp.raw | ./hist "hp" | play -1 -r 22050 -c 1 -t raw -s -
