@@ -22,7 +22,7 @@
 
 
 #define SAMPLE_SIZE 1
-#define SR 44100
+#define SR 22050
 #define NF (float)N
 #define SRF (float)SR
 

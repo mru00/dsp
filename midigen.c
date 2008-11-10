@@ -96,6 +96,8 @@ int main(int argc, char** argv) {
   if ( argc != 2 )
 	die ("usage: midigen midinote");
 
+  fprintf(stderr, "starting (midigen)\n");
+
   note = atoi ( argv[1]);
 
   calculate_frequencies();

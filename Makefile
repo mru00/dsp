@@ -1,5 +1,5 @@
-#CFLAGS += -g -ggdb -std=c99 -Wall -D__USE_XOPEN
-CFLAGS += -O3 -std=c99 -Wall -D__USE_XOPEN
+CFLAGS += -g -ggdb -std=c99 -Wall -D__USE_XOPEN -pg
+#CFLAGS += -O3 -std=c99 -Wall -D__USE_XOPEN -pg
 
 
 CFLAGS_HIST = $(CFLAGS) `pkg-config --cflags gtk+-2.0`

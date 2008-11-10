@@ -1,0 +1,185 @@
+
+bandpass.c,31
+#define N 4,40
+int main(9,83
+
+convolve.c,286
+#define N 28,434
+static float kernel[kernel33,492
+static char kernel_filename[kernel_filename35,546
+#define KERNEL_SIZE 37,590
+static void normalize_kernel(41,664
+static void print_kernel(54,877
+static void read_kernel(62,1032
+static void on_sigusr1(84,1471
+int main(91,1633
+
+hist.c,444
+#define N 17,262
+pthread_t gtk_thread;22,305
+GdkPixmap* pixmap;23,327
+GtkWidget *widget;widget24,346
+rfftw_plan plan;25,365
+buffer_t buffer[buffer27,383
+int current_buffer 28,406
+#define OFFLINE_BUFFER 32,433
+#define ONLINE_BUFFER 33,481
+float rc(37,553
+float ra(44,713
+int idx_to_x(56,932
+int pow_to_y(60,997
+on_destroy 69,1143
+expose_event 77,1276
+configure_event 113,2115
+void* gtk_thread_loop(133,2525
+int main(182,3773
+
+midigen.c,561
+#define N 4,39
+#define NOSC 10,83
+#define NCH 11,99
+#define NNOTE 12,114
+typedef struct tag_midi_header 21,363
+} midi_header_t;27,511
+typedef struct tag_track_header 35,682
+} track_header_t;47,893
+typedef struct tag_oscillator 50,913
+} oscillator_t;58,1062
+static oscillator_t  oscillators[oscillators61,1080
+static float         frequencies[frequencies62,1120
+static float         channel_volume[channel_volume63,1159
+static void calculate_frequencies(67,1203
+static void init_osc(75,1369
+static byte_t process_osc(81,1464
+int main(90,1632
+
+midimatch.c,517
+#define N 2,19
+#define NTONES 8,63
+#define BINLENGTH 9,82
+#define NOSC 10,104
+float act_freq[act_freq12,121
+float frequencies[frequencies13,145
+typedef struct tag_oscillator 18,176
+} oscillator_t;26,325
+byte_t        act_osc[act_osc28,342
+oscillator_t  oscillators[oscillators30,375
+static void calculate_frequencies(33,410
+static void init_osc(42,580
+static byte_t process_osc(48,675
+static int get_free_osc(57,818
+static float get_power(79,1177
+static void printnotes(84,1315
+int main(122,2097
+
+midiparse.c,714
+#define N 4,39
+typedef struct tag_midi_header 17,313
+} midi_header_t;23,461
+typedef struct tag_track_header 31,632
+} track_header_t;43,843
+FILE*         midi_file 46,863
+midi_header_t midi_header;47,895
+static word_t reorder_word(56,1178
+static dword_t reorder_dword(60,1265
+static void read_midi_header(66,1401
+static void print_midi_header(85,2045
+static void read_track_header(104,2508
+static void print_track_header(124,3025
+static byte_t* read_var_length(140,3374
+static void parse_event_data(156,3617
+static byte_t* print_meta_event(189,4216
+static void print_controller_msg(240,5670
+static byte_t* print_midi_event(379,13580
+static byte_t* print_sysex_event(408,14536
+int main(417,14705
+
+midiplay.c,1135
+#define N 3,38
+#define NOSC 10,83
+#define NCH 11,99
+#define NNOTE 12,114
+typedef struct tag_midi_header 21,363
+} midi_header_t;27,511
+typedef struct tag_track_header 35,682
+} track_header_t;47,893
+typedef struct tag_oscillator 50,913
+} oscillator_t;58,1062
+static oscillator_t  oscillators[oscillators61,1080
+static byte_t        act_osc[act_osc62,1120
+static float         frequencies[frequencies63,1159
+static float         channel_volume[channel_volume64,1198
+static FILE*         midi_file 65,1239
+static int           bpm 66,1278
+static int           samples_per_tick;67,1310
+static midi_header_t midi_header;68,1349
+static word_t reorder_word(76,1510
+static dword_t reorder_dword(80,1597
+static void read_midi_header(86,1733
+static void read_track_header(105,2386
+static byte_t* read_var_length(126,2953
+static unsigned long get_difftime(143,3231
+static byte_t* process_event(150,3404
+static void process_next_event_for_track(256,5553
+static void calculate_frequencies(276,5965
+static void init_osc(284,6131
+static byte_t process_osc(290,6226
+static int get_free_osc(299,6394
+int main(308,6573
+
+song.c,368
+#define N 12,158
+const float pregain 17,228
+#undef N19,254
+#define N 20,263
+#define ACCORD_SIZE 22,279
+typedef struct tag_song_t 27,344
+} song_t;31,443
+float ADSR(49,751
+void dump_song(69,1162
+song_t* read_song(85,1458
+void free_song(123,2144
+float cr(135,2321
+float cp(150,2762
+void play_note(156,2831
+buffer_t limit_output(176,3109
+int main(180,3176
+
+synth2.c,181
+#define N 22,367
+#define CK_SIZE 27,410
+#define F_BASE 28,453
+#define CKS_FILENAME 30,472
+float ck[ck32,504
+void read_ck_file(35,525
+void on_sigusr1(51,799
+int main(58,949
+
+synth.c,58
+#define N 13,197
+#define F_BASE 17,239
+int main(19,258
+
+test.c,15
+int main(3,20
+
+vocoder.c,53
+#define N 2,19
+#define F_BASE 7,62
+int main(10,81
+
+common.h,349
+#define SAMPLE_SIZE 24,414
+#define SR 25,436
+#define NF 26,453
+#define SRF 27,473
+typedef unsigned char byte_t;31,498
+typedef unsigned int dword_t;32,528
+typedef unsigned short word_t;33,558
+typedef char buffer_t;37,612
+typedef short buffer_t;39,657
+extern float idx_to_freq(53,866
+extern void die(58,939
+extern  int freq_to_idx(65,1067
+
+common.c,0

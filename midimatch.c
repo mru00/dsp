@@ -1,7 +1,7 @@
 #include <rfftw.h>
 #include <math.h>
 
-#define N (4096>>2)
+#define N (4096>>1)
 #include "common.h"
 
 
@@ -9,9 +9,11 @@
 #define BINLENGTH 256
 #define NOSC 30
 
-float act_freq[NTONES];
-float frequencies[NTONES];
-buffer_t buffer[N];
+static float act_freq[NTONES];
+static float frequencies[NTONES];
+static float frequencies2[NTONES];
+
+static buffer_t buffer[N];
 
 
 
@@ -26,15 +28,25 @@ typedef struct tag_oscillator {
 
 } oscillator_t;
 
-byte_t        act_osc[16][128];
 
-oscillator_t  oscillators[NOSC];
 
+static byte_t        act_osc[16][128];
+static oscillator_t  oscillators[NOSC];
+static float threshold = 15;
+
+
+static float cos_precalc[NTONES][N];
 
 static void calculate_frequencies() {
-  int i;
+  int i, n;
   for ( i = 0; i<NTONES; i++ ) {
 	frequencies[i] = 6.283185*(440.0/32.0) * pow(2.0, (float)(i-9)/12.0);
+	frequencies2[i] = 3.1415 *frequencies[i]/(SRF*4.0);
+
+	for ( n = 0; n < N; n++ ) {
+	  
+	  cos_precalc[i][n] = cos( (n+0.5)* frequencies2[i])/NF;
+	}
   }
 }
 
@@ -44,8 +56,8 @@ static void init_osc() {
 	oscillators[i].note = 0xff;
 }
 
-static byte_t process_osc(oscillator_t* osc) {
-  float f = 0.2*0.6*
+static inline byte_t process_osc(oscillator_t* osc) {
+  float f = 0.2*0.5*
 	(float)osc->velocity * 
 	sinf(osc->freq * (osc->t++));
 
@@ -63,20 +75,17 @@ static int get_free_osc() {
 
 static void printnotes() {
 
-  const float threshold = NF*40;
 
   int osc;
   int i, n;
   float power;
   
-  for ( i = 20; i<NTONES-20; i++ ) {
-	
-	
-	// dct:
-	power = 0;
-	for ( n = 0; n < N; n++ ) {
-	  power += buffer[n] * cos( 3.1415 * (n+0.5)* frequencies[i]/(SRF*4.0));
-	}
+  for ( i = 36; i<NTONES-10; i++ ) {
+		
+	// dctII:
+	power = 0.0f;
+	for ( n = 0; n < N; n++ ) 
+	  power += buffer[n] * cos_precalc[i][n];
 
 	power = abs(power);
 
@@ -92,15 +101,13 @@ static void printnotes() {
 		oscillators[osc].freq = frequencies[i-4]/SRF;
 		act_osc[0][i] = osc;
 	  }
-	  
-	  fprintf(stderr, "note on:  i:%d power:%f, freq:%f\n", i, log(power)/log(2), frequencies[i]);
 	}
 
-	if (power < threshold * 0.05 && act_freq[i] ) {
+	if (power < threshold * 0.1 && act_freq[i] ) {
 	  act_freq[i] = 0;
-	  fprintf(stderr, "note off: i:%d power:%f\n", i, log(power)/log(2));
 	  oscillators[act_osc[0][i]].note = 0xff;
 	}
+
   }
 
 }
@@ -113,7 +120,16 @@ int main(int argc, char** argv) {
   int i, rd, j;
   long bytes = 0;
 
-  while ( 1 ) {
+  if (argc != 2) 
+	die ("usage: midimatch threshold");
+
+  threshold = atoi (argv[1]);
+
+  fprintf(stderr, "starting (midimatch)\n"); 
+
+
+
+  while ( 1 ) { //&& bytes < 500000ul ) {
 	// read sample
 	rd = read(0, buffer, N* sizeof(buffer_t)); 
 
@@ -135,7 +151,6 @@ int main(int argc, char** argv) {
 	  
 	}
 
-	fprintf(stderr, ".");
 	rd = write(1, buffer, rd);
 	bytes += rd;
 

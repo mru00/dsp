@@ -1,3 +1,3 @@
 #! /bin/sh
 
-play -t raw -1 -c 1 -r 44100 -u -v 1.0 -q -
+play -t raw -1 -c 1 -r 22050 -u -v 1.0 -q -
