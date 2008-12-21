@@ -7,7 +7,7 @@
 const int N=4096;
 const int SR=44100;
 
-#define NOSC 10
+#define NOSC 20
 #define NCH 16
 #define NNOTE 128
 
@@ -379,7 +379,8 @@ int main(int argc, char** argv) {
 	if (sample_count++ == samples_per_tick) {
 
 	  if ( debug > 2 ) 
-		fprintf(stderr, "processing next sample samples_per_tick=%d\n", samples_per_tick);
+		fprintf(stderr, "processing next sample samples_per_tick=%d\n", 
+				samples_per_tick);
 
 	  sample_count = 0;
 
@@ -387,7 +388,8 @@ int main(int argc, char** argv) {
 	  for (i = 0; i< midi_header.numberOfTracks; i++ ) {
 		if ( !track_headers[i].done ) {
 		  
-		  if ( debug > 1 ) fprintf(stderr, "(%d) processing track:%d\n", absolute_time, i);
+		  if ( debug > 1 ) fprintf(stderr, "(%ld) processing track:%d\n", 
+								   absolute_time, i);
 
 		  process_next_event_for_track(track_headers + i );
 		  done ++;

@@ -3,15 +3,13 @@
 ##
 
 
-#USE_PG = -pg
-USE_PG = 
 
-DEBUG = -g -ggdb
-#DEBUG = -O3
+#DEBUG = -g -ggdb
+DEBUG = -O3
 
 
-CFLAGS += $(DEBUG) -std=c99 -Wall  $(USE_PG) -D_XOPEN_SOURCE=600
-LDFLAGS += -lm common.o
+CFLAGS += $(DEBUG) -std=c99 -Wall  -D_XOPEN_SOURCE=600 # -pg
+LDFLAGS += -lm common.o # -lefence
 
 
 SRC = convolve.c  vocoder.c synth.c synth2.c song.c \

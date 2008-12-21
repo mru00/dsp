@@ -39,7 +39,7 @@ typedef word_t buffer_t;
 # error "unhandled buffer type"
 #endif
 
-
+static const double pi = 3.1415;
 
 
 extern void die(const char* msg);
@@ -59,5 +59,14 @@ static inline word_t reorder_word(word_t in) {
 }
 
 static inline dword_t reorder_dword(dword_t in) {
-  return reorder_word((in >> 16)&0xffff) | reorder_word(in&0xffff);
+  return (reorder_word((in >> 16)&0xffff)) | (reorder_word(in&0xffff)<<16);
+}
+
+static inline double midi_note_to_herz(int note) {
+  return (440.0/32.0) * pow(2.0, (double)(note-9)/12.0);
+}
+
+
+static inline double herz_to_radians(double herz) {
+  return herz * 2.0 * pi;
 }

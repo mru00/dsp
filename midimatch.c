@@ -13,7 +13,6 @@
 #include "common.h"
 
 
-const float pi = 3.1415;
 const int SR = 44100;
 
 #define min(x,y) ((x)<(y)?(x):(y))
@@ -23,45 +22,47 @@ const int SR = 44100;
 #define BINLENGTH 256
 #define NOSC 70
 
-#define RINGBUFFERLOGSIZE 3
-#define RINGBUFFERSIZE (1<<RINGBUFFERLOGSIZE)
+#define RINGBUFFERLOGSIZE 2
+#define RINGBUFFERSIZE (1<<ringsize)
 #define RINGBUFFERMASK (RINGBUFFERSIZE-1)
 
 static int N = 4096>>1;
 static int periodics[NTONES];
 
-static float         *cos_precalc[NTONES];
-static float         act_freq[NTONES];
-static float         *buffer_f[RINGBUFFERSIZE];
-static float         threshold = 15;
-static float         weighting_ELC[NTONES];
+static double         *cos_precalc[NTONES];
+static double         act_freq[NTONES];
+static double         **buffer_f;
+static double         threshold = 15.0;
+static double         weighting_ELC[NTONES];
 static short         debug = 0;
 static short         print_freqs = 0;
 static short         use_harm_comp = 0;
 static const int     lo_note = 30;
-static const int     hi_note = 80;
+static const int     hi_note = 100;
 static long          absolute_time = 0;
 static FILE*         midi_file = NULL;
 static long          midi_difftime = 0;
-static byte_t        midi_last_status = 0xff;
+static byte_t        midi_running_status = 0xff;
 static int           samples_per_tick;
-static const int     midi_bpm = 80;
+static const double  midi_bpm = 120.0;
 static const int     midi_timeDivision = 120;
-
+static double        gain = 1.0;
+static double        hysteresis = 7;
+static short         ringsize = 0;
 static short current_buffer=0;
 
 
 // http://en.wikipedia.org/wiki/A-weighting
-static float 
-ra2(float f) {
+static double 
+ra2(double f) {
 
-  const float a2 = 12200*12200;
-  const float b2 = 20.6*20.6;
-  const float c2 = 107.7*107.7;
-  const float d2 = 737.9*737.9;
-  float f2 = f*f;
+  const double a2 = 12200*12200;
+  const double b2 = 20.6*20.6;
+  const double c2 = 107.7*107.7;
+  const double d2 = 737.9*737.9;
+  double f2 = f*f;
 
-  float ra = a2 * f2*f2 / ( (f2+b2) * sqrt( (f2+c2)*(f2+d2) ) * (f2+a2) ); 
+  double ra = a2 * f2*f2 / ( (f2+b2) * sqrt( (f2+c2)*(f2+d2) ) * (f2+a2) ); 
   return ra;
   return 2.0 + 20*log10(ra);
 }
@@ -69,21 +70,21 @@ ra2(float f) {
 static void 
 calculate_frequencies() {
 
-  float hz, rad, rad_per_sample;
+  double hz, rad, rad_per_sample;
   int note, k, per, p;
   for ( note = lo_note; note< hi_note; note++ ) {
 
-	hz = (440.0/32.0) * pow(2.0, (float)(note-9)/12.0);
-	rad = hz * 2.0 * pi;
-	rad_per_sample = rad / (float)SR;
+	hz = midi_note_to_herz(note);
+	rad = herz_to_radians(hz);
+	rad_per_sample = rad / (double)SR;
 
 	per = min(ceil( 2.0 * pi/rad_per_sample), RINGBUFFERSIZE*N);
 
-	cos_precalc[note] = (float*)malloc ( 2* per * sizeof(float));
+	cos_precalc[note] = (double*)malloc ( 2* per * sizeof(double));
 
 	for ( p = 0, k = 0; k < per; k++ ) {
-	  cos_precalc[note][p++] = cos( rad_per_sample * (float) k );
-	  cos_precalc[note][p++] = sin( rad_per_sample * (float) k );
+	  cos_precalc[note][p++] = cos( rad_per_sample * (double) k );
+	  cos_precalc[note][p++] = sin( rad_per_sample * (double) k );
 	}
 
 	weighting_ELC[note] = ra2(hz);
@@ -125,9 +126,9 @@ midi_write_note_event(byte_t type, byte_t note, byte_t velocity) {
   midi_difftime = 0;
 
   // running status
-  if ( type != midi_last_status ) {
+  if ( type != midi_running_status ) {
 	fwrite(&type, 1, 1, midi_file);
-	midi_last_status = type;
+	midi_running_status = type;
   }
 
   fwrite(&note, 1, 1, midi_file);
@@ -141,8 +142,8 @@ static void
 scan_freqs() {
 
   int note, j, k, p, c;
-  float power_re, power_im;
-  float power;
+  double power_re, power_im;
+  double power;
   int buffer_index;
 
   for ( note = lo_note; note<hi_note; note++ ) {
@@ -155,7 +156,7 @@ scan_freqs() {
 	// z-transform
 	c = p = 0;
 	for ( j = 0; j < RINGBUFFERSIZE; j++ ) {
-	  buffer_index = (current_buffer - j) & RINGBUFFERMASK;
+	  buffer_index = (current_buffer + j) & RINGBUFFERMASK;
 
 	  for ( k = 0; k < N ; k++ ) {
 		power_re += buffer_f[buffer_index][k] * cos_precalc[note][p++];
@@ -168,7 +169,10 @@ scan_freqs() {
 
 
 	// power = 20 log10 ( |power| )
-	power = 70000*absolute(power_re,power_im)*weighting_ELC[note]/(float)c;
+	power = 70000*absolute(power_re,power_im);
+	power *= weighting_ELC[note];
+	power /= (double)c;
+	power /= gain;
 
 	if (debug>1) 
 	  fprintf(stderr, "midimatch: (%ld) note:%-3d power:%-5.0f "
@@ -189,7 +193,7 @@ scan_freqs() {
 	  while ( j > lo_note ) {
 		if (act_freq[j]) {
 		  power = -10000.0;
-		  //		  break;
+		  break;
 		}
 		j -= 12;
 	  }
@@ -208,7 +212,7 @@ scan_freqs() {
 	}
 
 	// note off
-	if (power < (threshold * 0.3) && act_freq[note] ) {
+	if (power < (threshold / hysteresis) && act_freq[note] ) {
 
 	  if (debug>0) 
 		fprintf(stderr, "midimatch: (%ld, %ld) note off: note:%-3d p:%.2f\n", 
@@ -253,17 +257,22 @@ midi_write_track_header() {
 
 static void 
 midi_fixup_chunksize() {
-  int chunksize = reorder_dword(ftell(midi_file) - track_chunksize_fixup);
+
+  long pos = ftell(midi_file);
+
+  int chunksize = reorder_dword(pos - track_chunksize_fixup - 4);
 
   fseek(midi_file,track_chunksize_fixup, SEEK_SET);
   fwrite(&chunksize, 4, 1, midi_file);
+
+  fseek(midi_file, pos, SEEK_SET);
 }
 
 static void
 midi_write_track_end() {
   byte_t b;
 
-  midi_write_var_length ( midi_difftime );
+  midi_write_var_length ( 0 );
   midi_difftime = 0;
 
   b = 0xFF; fwrite(&b, 1, 1, midi_file);
@@ -274,7 +283,17 @@ midi_write_track_end() {
 
 static void 
 usage() {
-  fprintf(stderr, "usage: midimatch [-d] [-p] [-h] [-o filename] [-m] [-N number_of_samples] threshold\n");
+  fprintf(stderr, 
+		  "usage: midimatch OPTIONS threshold\n"
+		  "  [-d]             increase debug level\n"
+		  "  [-p]             print frequency table\n"
+		  "  [-h]             use harmonic compensation\n"
+		  "  [-o filename]    write midi data to filename, matched.midi is default\n"
+		  "  [-g gain]        apply gain on input (float, applied multiplicaive)\n"
+		  "  [-m]             write midi to stdout\n"
+		  "  [-N numberofsamples] input buffer size, 2^ringsize*N ~ 4000\n"
+		  "  [-k hysteresis]  float, ~10\n"
+		  "  [-r ringsize]    2 or 3, will be used as 2^ringsize\n");
   abort();
 }
 
@@ -290,14 +309,17 @@ main(int argc, char** argv) {
 
 
   int c;
-  while ( ( c = getopt(argc, argv, "dphN:o:m") ) != -1) 
+  while ( ( c = getopt(argc, argv, "dphN:o:mg:k:r:") ) != -1) 
 	switch (c) {
 	case 'd': debug++; break;
 	case 'p': print_freqs = 1; break;
 	case 'h': use_harm_comp = 1; break;
 	case 'N': N = atoi(optarg); break;
+	case 'g': gain = atof(optarg); break;
 	case 'o': midi_filename =strdup(optarg); break;
 	case 'm': midi_stdout = 1;  break;
+	case 'k': hysteresis = atof(optarg); break;
+	case 'r': ringsize = atoi(optarg); break;
 	default: usage();
 	}
 
@@ -309,10 +331,12 @@ main(int argc, char** argv) {
 
   print_prologoue(N, SR);
 
-  buffer = malloc ( N * sizeof(buffer_t) );
+  buffer = (buffer_t*)malloc ( N * sizeof(buffer_t) );
+
+  buffer_f = (double**)malloc ( RINGBUFFERSIZE * sizeof(double*) );
 
   for ( j = 0; j < RINGBUFFERSIZE; j++ ) 
-	buffer_f[j] = malloc ( N * sizeof(float) );
+	buffer_f[j] = malloc ( N * sizeof(double) );
 
   calculate_frequencies();
 
@@ -322,7 +346,7 @@ main(int argc, char** argv) {
   midi_write_header();
   midi_write_track_header();
 
-  samples_per_tick = (float)SR * ((float)midi_bpm/60) / (float)midi_timeDivision;  
+  samples_per_tick = (double)SR*midi_bpm / (60.0*(double)midi_timeDivision);
 
   while ( 1 ) { 
 	// read sample
@@ -337,9 +361,9 @@ main(int argc, char** argv) {
 	}
 
 	for ( j = 0; j < N; j++ ) {
-	  buffer_f[current_buffer][j] = ((float)buffer[j]-128)/128.0;
+	  buffer_f[current_buffer][N-j-1] = gain*((double)buffer[j]-128);
 	}
-	current_buffer = (current_buffer+1) & RINGBUFFERMASK;
+	current_buffer = (current_buffer-1) & RINGBUFFERMASK;
 
 
 	div_t r = div(rest+ N, samples_per_tick);
@@ -348,15 +372,14 @@ main(int argc, char** argv) {
 
 	absolute_time += N;
 
-
 	scan_freqs();
-
   }
 
 
   free(buffer);
   for ( j = 0; j < RINGBUFFERSIZE; j++ ) 
 	free(buffer_f[j]);
+  free(buffer_f);
 
   for (i = 0; i< NTONES; i++ ) {
 	free(cos_precalc[i]);
