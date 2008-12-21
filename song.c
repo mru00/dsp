@@ -9,15 +9,12 @@
 #include <rfftw.h>
 #include <math.h>
 
-#define N (4096<<0)
-
 #include "common.h"
 
 // output volume multiplier
 const float pregain = 2;
-
-#undef N
-#define N 1024
+const int N=1024;
+const int SR=44100;
 
 #define ACCORD_SIZE 5
 
@@ -110,7 +107,7 @@ song_t* read_song(const char* filename) {
 	i = 0;
 	do {
 		retval = fscanf(song_file, "%f", &note);
-		next->accord[i++] = freq_to_idx(note);
+		next->accord[i++] = freq_to_idx(note, SR, N);
 	} while ( retval != 0 );
 
 	fscanf(song_file, " ) ");
@@ -188,6 +185,8 @@ int main(int argc, char** argv) {
   song_t* head;
   song_t* next;
 
+  print_prologoue(N, SR);
+
   next = head = read_song("song.txt");
   dump_song(head);
   plan_backward = rfftw_create_plan(N, FFTW_COMPLEX_TO_REAL, FFTW_ESTIMATE);
@@ -223,6 +222,6 @@ int main(int argc, char** argv) {
 
   rfftw_destroy_plan(plan_backward);
   free_song(head);
-
+  print_epilogue();
   return 0;
 }

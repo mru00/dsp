@@ -1,10 +1,10 @@
 #include <rfftw.h>
 #include <signal.h>
 
-#define N (4096<<0)
-
 #include "common.h"
 
+const int N = 4096;
+const int SR = 44100;
 
 int main(int argc, char** argv) {
 
@@ -22,11 +22,13 @@ int main(int argc, char** argv) {
   if ( argc != 3 )
 	die("usage: bandpass lofreq hifreq");
 
+  print_prologoue(N, SR);
+
   sscanf(argv[1], "%f", &lofreq);
   sscanf(argv[2], "%f", &hifreq);
 
-  loidx = freq_to_idx(lofreq);
-  hiidx = freq_to_idx(hifreq);
+  loidx = freq_to_idx(lofreq, SR, N);
+  hiidx = freq_to_idx(hifreq, SR, N);
 
   assert (loidx < hiidx);
   assert (loidx >= 0);
@@ -45,7 +47,7 @@ int main(int argc, char** argv) {
 	if ( rd != N*sizeof(buffer_t) )  {
 	  fprintf(stderr, "%li bytes processed, %d read, exiting (vocoder)\n", 
 			  bytes, rd);
-	  return 0;
+	  break;
 	}
 	
 
@@ -72,6 +74,8 @@ int main(int argc, char** argv) {
 
   rfftw_destroy_plan(plan_forward);
   rfftw_destroy_plan(plan_backward);
+
+  print_epilogue();
 
   return 0;
 }

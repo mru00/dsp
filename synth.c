@@ -10,9 +10,10 @@
 
 #include <rfftw.h>
 
-#define N (4096<<0)
-
 #include "common.h"
+
+const int N = 4096;
+const int SR = 44100;
 
 #define F_BASE 30
 
@@ -27,6 +28,7 @@ int main(void) {
 
   plan_backward = rfftw_create_plan(N, FFTW_COMPLEX_TO_REAL, FFTW_ESTIMATE);
 
+  print_prologoue(N, SR);
 
   while ( 1 ) {
 
@@ -46,10 +48,13 @@ int main(void) {
 	for ( i = 0; i < N; i++ ) 
 	  buffer[i] = in[i]/N;
 
-  	write(1, buffer, N* sizeof(buffer_t));
+  	rd = write(1, buffer, N* sizeof(buffer_t));
 	bytes += rd;
   }
 
   rfftw_destroy_plan(plan_backward);
+
+  print_epilogue();
+
   return 0;
 }

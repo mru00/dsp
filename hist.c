@@ -14,19 +14,17 @@
 #include <rfftw.h>
 #include <glib.h>
 
-#define N (4096<<0)
-
 #include "common.h"
-
+const int N = 4096;
+const int SR = 44100;
 
 pthread_t gtk_thread;
 GdkPixmap* pixmap;
 GtkWidget *widget;
 rfftw_plan plan;
 
-buffer_t buffer[2][N];
+buffer_t *buffer[2];
 int current_buffer = 0;
-
 
 
 #define OFFLINE_BUFFER buffer[current_buffer^1]
@@ -35,7 +33,7 @@ int current_buffer = 0;
 
 // equal loudness curves
 float rc(int i) {
-  double f = (double)i * SRF/NF;
+  double f = (double)i * SR/N;
   //  return 1.0;
   return ( 12200*12200*f*f /((f*f+20.62)*(f*f+12200*12200)) );
 }
@@ -43,7 +41,7 @@ float rc(int i) {
 // equal loudness curves
 float ra(int i) {
 
-  double f = idx_to_freq(i);
+  double f = idx_to_freq(i, SR, N);
   double a = 12200;
   double b = 20.6;
   double c = 107.7;
@@ -54,7 +52,7 @@ float ra(int i) {
 
 
 int idx_to_x(int i) {
-  return 40*log(idx_to_freq(i))/log(2);
+  return 40*log(idx_to_freq(i, SR, N))/log(2);
 }
 
 int pow_to_y(int i,float re, float im) {
@@ -192,6 +190,9 @@ int main(int argc, char** argv) {
   pthread_create(&gtk_thread, NULL, gtk_thread_loop, (void*)argv[1]); 
   plan = rfftw_create_plan(N, FFTW_REAL_TO_COMPLEX, FFTW_ESTIMATE);
 
+  buffer[0] = malloc ( N*sizeof(buffer_t));
+  buffer[1] = malloc ( N*sizeof(buffer_t));
+
   
   sleep(1);
 
@@ -210,10 +211,8 @@ int main(int argc, char** argv) {
 
 #else
 
-	for (i=0; i<N; i++) {
-
+	for (i=0; i<N; i++)
 	  rd = read(0, &ONLINE_BUFFER[i], sizeof(buffer_t)); 
-	}
 
 	if ( rd < 1 )  {
 	  fprintf(stderr, "%li bytes processed, %d read, exiting (%s)\n", bytes, rd, argv[1]);
@@ -221,8 +220,6 @@ int main(int argc, char** argv) {
 	}
 
 #endif
-
-
 
 
 	gdk_threads_enter();
@@ -239,14 +236,13 @@ int main(int argc, char** argv) {
 #endif
 
 	current_buffer ^= 1;
-
-	
-
-	
   }
 
   pthread_join(gtk_thread, NULL);
   rfftw_destroy_plan(plan);
+  
+  free(buffer[0]);
+  free(buffer[1]);
 
   return 0;
 }

@@ -25,11 +25,15 @@
 
 #include <signal.h>
 
-#define N (4096<<0)
 
 #include "common.h"
 
-// no-op kernel
+
+const int N=4096;
+const int SR = 44100;
+
+
+// No-op kernel
 static float kernel[] = { 0.0, 0.0, 1.0, 0.0, 0.0 };
 
 static char kernel_filename[FILENAME_MAX];
@@ -100,6 +104,8 @@ int main(int argc, char** argv) {
   if (argc == 2) 
 	read_kernel(argv[1]);
 
+  print_prologoue(N, SR);
+
   print_kernel();
   normalize_kernel();
   print_kernel();
@@ -114,7 +120,7 @@ int main(int argc, char** argv) {
 	// eof
 	if ( rd != sizeof(buffer_t) ) {
 	  fprintf(stderr, "%li bytes processed, exiting (convolve)\n", bytes);
-	  return 0;
+	  break;
 	}
 
 	// shift buffer; forward one sample
@@ -135,5 +141,6 @@ int main(int argc, char** argv) {
 	bytes += rd;
   } 
 
+  print_epilogue();
   return 0;
 }

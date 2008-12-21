@@ -1,11 +1,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define N (4096<<0)
-
-
 #include "common.h"
 
+const int N = 4096;
+const int SR = 44100;
 
 /*
  *   0x00	4	char[4]	chunk ID	"MThd" (0x4D546864)
@@ -50,16 +49,6 @@ static byte_t* read_var_length(byte_t* ptr, unsigned long* result);
 static byte_t* print_midi_event(byte_t status, byte_t* data);
 static byte_t* print_meta_event(byte_t* data);
 static byte_t* print_sysex_event(byte_t* data);
-
-
-// midi is wrong byte order
-static word_t reorder_word(word_t in) {
-  return ((in>>8)&0xff) | ((in&0xff) << 8);
-}
-
-static dword_t reorder_dword(dword_t in) {
-  return reorder_word((in >> 16)&0xffff) | reorder_word(in&0xffff);
-}
 
 
 // parse midi header
@@ -196,8 +185,7 @@ static byte_t* print_meta_event(byte_t* data) {
   data = read_var_length(data, &length);
 
   switch(eventType) {
-  case 0x00: printf(
-					 "sequence number: %u\n", 
+  case 0x00: printf("sequence number: %u\n", 
 					 (data[0]<<8)+data[1]); 
 	break;
   case 0x01: printf("text message: %s\n", data); break;
@@ -207,26 +195,21 @@ static byte_t* print_meta_event(byte_t* data) {
   case 0x05: printf("lyric: %s\n", data); break;
   case 0x06: printf("marker: %s\n", data); break;
   case 0x07: printf("cue point: %s\n", data); break;
-  case 0x21: printf(
-					 "midi port %d\n", 
+  case 0x21: printf("midi port %d\n", 
 					 data[0]); break;
   case 0x2F: printf("end of track\n"); break;
-  case 0x51: printf(
-					 "set tempo %u (bpm = %f)\n", 
+  case 0x51: printf("set tempo %u (bpm = %f)\n", 
 					 ((data[0]<<16)|(data[1]<<8)|(data[2])),
 					 60000000.0/(((data[0]<<16)|(data[1]<<8)|(data[2])))); 
 	break;
-  case 0x54: printf(
-					 "SMPTE Offset hr:%d mn:%d se:%d fr:%d ff:%d\n",
+  case 0x54: printf("SMPTE Offset hr:%d mn:%d se:%d fr:%d ff:%d\n",
 					 data[0], data[1], data[2], data[3], data[4]); 
 	break;
-  case 0x58: printf(
-					 "time signature: nn:%d dd:%d cc:%d bb:%d\n",
+  case 0x58: printf("time signature: nn:%d dd:%d cc:%d bb:%d\n",
 					 data[0], data[1], data[2], data[3]); 
 	break;
-  case 0x59: printf(
-					 "key signature: sf:%d mi:%d\n", 
-					 data[0], data[1]); 
+  case 0x59: printf("key signature: sf:%d mi:%d\n", 
+					data[0], data[1]); 
 	break;
   case 0x7F: printf("sequencer-specific\n"); 
 	break;
@@ -384,7 +367,7 @@ static byte_t* print_midi_event(byte_t status, byte_t* data) {
   printf ( " midi: ch: %d ", channel);
 
   switch ( eventType ) {
-  case 0x8: printf("Note Off note:%-3d  velocity:%-3d\n", 
+  case 0x8: printf("Note Off note:%-3d velocity:%-3d\n", 
 					data[0],data[1]); data += 2; break;
   case 0x9: printf("Note On  note:%-3d velocity:%-3d\n", 
 					data[0],data[1]); data += 2; break;
@@ -420,13 +403,20 @@ int main(int argc, char** argv) {
   int i;
 
 
-  if (argc != 2)
-	die("usage: midi midifile");
+  if (argc == 1)
+	midi_file = stdin;
+  else if ( argc == 2 )
+	midi_file = fopen(argv[1], "rb");
+  else 
+	die("usage: midiparse [midifile]");
 
-  midi_file = fopen(argv[1], "rb");
+  
+
 
   if (midi_file == NULL)
 	die("failed to open midifile");
+
+  print_prologoue(N, SR);
 
   read_midi_header(&midi_header);
   print_midi_header(&midi_header);
@@ -442,6 +432,6 @@ int main(int argc, char** argv) {
   }
 
   fclose(midi_file);
-
+  print_epilogue();
   return 0;
 }

@@ -1,8 +1,9 @@
 #include <rfftw.h>
-#define N (4096<<0)
 
 #include "common.h"
 
+const int N=4096;
+const int SR = 44100;
 
 #define F_BASE 2
 
@@ -14,6 +15,7 @@ int main(void) {
   rfftw_plan plan_forward, plan_backward;
   buffer_t buffer[N];
 
+  print_prologoue(N, SR);
 
   int i, rd;
   long bytes = 0;
@@ -35,7 +37,7 @@ int main(void) {
 	if ( rd != N*sizeof(buffer_t) )  {
 	  fprintf(stderr, "%li bytes processed, %d read, exiting (vocoder)\n", 
 			  bytes, rd);
-	  return 0;
+	  break;
 	}
 
 	for ( i = 0; i < N; i++ ) 
@@ -61,6 +63,8 @@ int main(void) {
 
   rfftw_destroy_plan(plan_forward);
   rfftw_destroy_plan(plan_backward);
+
+  print_epilogue();
 
   return 0;
 }

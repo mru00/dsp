@@ -1,11 +1,11 @@
+#include <getopt.h>
 #include <stdlib.h>
 #include <math.h>
-#define N (4096<<0)
-
-
 
 #include "common.h"
 
+const int N=4096;
+const int SR=44100;
 
 #define NOSC 10
 #define NCH 16
@@ -51,7 +51,7 @@ typedef struct tag_oscillator {
   
   byte_t channel;
   byte_t velocity;
-  byte_t note;     // == 0xff: osc is free
+  //  byte_t note;     // == 0xff: osc is free
   float freq;
   unsigned long t;
 
@@ -66,20 +66,13 @@ static FILE*         midi_file = NULL;
 static int           bpm = 120;
 static int           samples_per_tick;
 static midi_header_t midi_header;
-
+static long          absolute_time = 0;
 static byte_t* read_var_length(byte_t* ptr, unsigned long* result);
 static int get_free_osc();
 
+static short debug = 0;
+static short print_notes = 0;
 
-
-// midi is wrong byte order
-static word_t reorder_word(word_t in) {
-  return ((in>>8)&0xff) | ((in&0xff) << 8);
-}
-
-static dword_t reorder_dword(dword_t in) {
-  return reorder_word((in >> 16)&0xffff) | reorder_word(in&0xffff);
-}
 
 
 // parse midi header
@@ -113,6 +106,9 @@ static void read_track_header(track_header_t* hdr) {
   hdr->eventData = (byte_t*) malloc(hdr->chunkSize);
   hdr->nextEvent = hdr->eventData;
   hdr->done = 0;
+
+  
+  if ( debug > 0 ) fprintf(stderr, "reading track chucksize:%d\n", hdr->chunkSize);
 
   fread(hdr->eventData, hdr->chunkSize, 1, midi_file);
 
@@ -156,6 +152,8 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
   byte_t par1=0, par2=0;
   int osc;
 
+  if ( debug > 1 ) fprintf (stderr, "process event at %p\n", ptr);
+
   // difftime
   ptr = read_var_length(ptr, &difftime);
 
@@ -178,7 +176,7 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
 	  break;
 	case 0x51: // set tempo
 	  bpm = 60000000.0/(((ptr[0]<<16)|(ptr[1]<<8)|(ptr[2]))); 
-	  samples_per_tick = 0.5 * SRF * (bpm/60.0) / (float)midi_header.timeDivision;  
+	  samples_per_tick = 0.5 * SR * (bpm/60.0) / (float)midi_header.timeDivision;  
 	  break;
 	} 
 
@@ -208,22 +206,29 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
 	
 	switch ( eventType ) {
 	case 0x8: // note off
-	  oscillators[act_osc[channel][par1]].note = 0xff;
+	  oscillators[act_osc[channel][par1]].velocity = 0;
+	  if ( print_notes ) fprintf (stderr, 
+								  "midiplay: (%ld) note off ch:%-2d i:%-3d\n", 
+								  absolute_time, channel, par1);
 	  break;
-	case 0x9: // note on
+ 	case 0x9: // note on
 	  if ( par2 != 0 ) {
 		osc = get_free_osc();
 		if (osc != -1) {
 		  oscillators[osc].t = 0;
-		  oscillators[osc].note = par1;
 		  oscillators[osc].velocity = par2;
 		  oscillators[osc].channel = channel;
 		  oscillators[osc].freq = frequencies[par1];
 		  act_osc[channel][par1] = osc;
 		}
+
+		if ( print_notes ) fprintf (stderr, 
+									"midiplay: (%ld) note on  ch:%-2d i:%-3d\n", 
+									absolute_time, channel, par1);
+
 	  }
 	  else {
-		oscillators[act_osc[channel][par1]].note = 0xff;
+		oscillators[act_osc[channel][par1]].velocity = 0;
 	  }
 	  break;
 	case 0xD: // channel aftertouch
@@ -257,7 +262,12 @@ static void process_next_event_for_track(track_header_t* hdr) {
 
   byte_t* ptr = hdr->nextEvent;
 
+  if ( debug > 3 ) fprintf(stderr, "process next event for track\n");
+
   if ( hdr->decrementedDiffTime == 0 ) {
+
+	if ( debug > 2 ) fprintf(stderr, "process next event for track, difftime = 0\n");
+
 
 	ptr = process_event(hdr, ptr);
 
@@ -276,7 +286,7 @@ static void process_next_event_for_track(track_header_t* hdr) {
 static void calculate_frequencies() {
   int i;
   for ( i = 0; i<128; i++ ) {
-	frequencies[i] = 2.0*6.283185*(440.0/32.0) * pow(2.0, (float)(i-9)/12.0) / SRF;
+	frequencies[i] = 2.0*6.283185*(440.0/32.0) * pow(2.0, (float)(i-9)/12.0) / SR;
   }
 }
 
@@ -284,7 +294,7 @@ static void calculate_frequencies() {
 static void init_osc() {
   int i;
   for (i = 0; i< NOSC; i++) 
-	oscillators[i].note = 0xff;
+	oscillators[i].velocity = 0;
 }
 
 static byte_t process_osc(oscillator_t* osc) {
@@ -299,10 +309,15 @@ static byte_t process_osc(oscillator_t* osc) {
 static int get_free_osc() {
   int i;
   for (i = 0; i< NOSC; i++) 
-	if (oscillators[i].note == 0xff) return i;
+	if (oscillators[i].velocity == 0) return i;
 
   fprintf(stderr, "not enouth free oscillators\n");
   return -1;
+}
+
+static void usage() {
+  fprintf(stderr, "usage: midiplay [-p] [-d] midifile\n");
+  abort();
 }
 
 int main(int argc, char** argv) {
@@ -312,16 +327,29 @@ int main(int argc, char** argv) {
   byte_t output;
   int i, j;
   int done;
+  int c;
 
+  while ( (c=getopt(argc, argv, "dp")) != -1) 
+	switch(c) {
+	case 'd': debug ++; break;
+	case 'p': print_notes = 1; break;
+	default: usage();
+	}
 
-  if (argc != 2)
+  if (argc == optind)
 	die("usage: midi midifile");
 
-  midi_file = fopen(argv[1], "rb");
+  if ( strncmp ( argv[optind], "-", 1) == 0 )
+	midi_file = stdin;
+  else 
+	midi_file = fopen(argv[optind++], "rb");
+
+  optind++;
 
   if (midi_file == NULL)
 	die("failed to open midifile");
 
+  print_prologoue(N, SR);
 
   read_midi_header(&midi_header);
 
@@ -344,15 +372,23 @@ int main(int argc, char** argv) {
 	channel_volume[j] = 0.7;
 
   while ( 1 ) {
+	
+	absolute_time ++;
 
 	// midi events ready?
 	if (sample_count++ == samples_per_tick) {
+
+	  if ( debug > 2 ) 
+		fprintf(stderr, "processing next sample samples_per_tick=%d\n", samples_per_tick);
 
 	  sample_count = 0;
 
 	  done = 0;
 	  for (i = 0; i< midi_header.numberOfTracks; i++ ) {
 		if ( !track_headers[i].done ) {
+		  
+		  if ( debug > 1 ) fprintf(stderr, "(%d) processing track:%d\n", absolute_time, i);
+
 		  process_next_event_for_track(track_headers + i );
 		  done ++;
 		}
@@ -366,12 +402,14 @@ int main(int argc, char** argv) {
 	output = 128;
 
 	for ( i = 0; i< NOSC; i++)
-	  if (oscillators[i].note != 0xff)
+	  if (oscillators[i].velocity != 0)
 		output += process_osc(oscillators+i);
 
 	// write output
 	fwrite(&output, 1, 1, stdout);
   }
+
+  print_epilogue();
 
   return 0;
 }

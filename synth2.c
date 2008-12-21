@@ -19,10 +19,11 @@
 #include <rfftw.h>
 #include <signal.h>
 
-#define N (4096<<0)
 
 #include "common.h"
 
+const int N = 4096;
+const int SR = 44100;
 
 #define CK_SIZE 10      // number of ck's 
 #define F_BASE 30
@@ -65,6 +66,8 @@ int main(void) {
   int i, rd;
   long bytes = 0;
 
+  print_prologoue(N, SR);
+
   plan_backward = rfftw_create_plan(N, FFTW_COMPLEX_TO_REAL, FFTW_ESTIMATE);
 
   read_ck_file("cks.txt");
@@ -92,7 +95,7 @@ int main(void) {
 	for ( i = 0; i < N; i++ ) 
 	  buffer[i] = in[i]/(N*2);
 
-  	write(1, buffer, N* sizeof(buffer_t));
+  	rd = write(1, buffer, N* sizeof(buffer_t));
 	bytes += rd;
 
 
@@ -100,6 +103,6 @@ int main(void) {
 
 
   rfftw_destroy_plan(plan_backward);
-
+  print_epilogue();
   return 0;
 }

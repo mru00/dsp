@@ -1,11 +1,11 @@
+#include <getopt.h>
 #include <stdlib.h>
 #include <math.h>
 
-#define N (4096<<0)
-
-
 #include "common.h"
 
+const int N = 4096;
+const int SR = 44100;
 
 #define NOSC 10
 #define NCH 16
@@ -59,15 +59,17 @@ typedef struct tag_oscillator {
 
 
 static oscillator_t  oscillators[NOSC];
-static float         frequencies[128];
+static float         frequencies_hz[128];
+static float         frequencies_rad[128];
 static float         channel_volume[16];
-
+static short debug = 0;
 
 
 static void calculate_frequencies() {
   int i;
   for ( i = 0; i<128; i++ ) {
-	frequencies[i] = 2.0*6.283185*(440.0/32.0) * pow(2.0, (float)(i-9)/12.0) / SRF;
+	frequencies_hz[i] = (440.0/32.0) * pow(2.0, (float)(i-9)/12.0);
+	frequencies_rad[i] = frequencies_hz[i]*6.283185;
   }
 }
 
@@ -92,13 +94,21 @@ int main(int argc, char** argv) {
   byte_t output;
   int j;
   int note;
+  int c;
 
-  if ( argc != 2 )
-	die ("usage: midigen midinote");
+  while ( (c=getopt(argc, argv, "d")) != -1 )
+	switch (c) {
+	case 'd': debug = 1; break;
+	default: abort();
+	}
+		  
+  if ( optind == argc )
+	die ("usage: midigen [-d] midinote");
 
-  fprintf(stderr, "starting (midigen)\n");
 
-  note = atoi ( argv[1]);
+  print_prologoue(N, SR);
+
+  note = atoi ( argv[optind++]);
 
   calculate_frequencies();
   init_osc();
@@ -110,7 +120,10 @@ int main(int argc, char** argv) {
   oscillators[0].note = note;
   oscillators[0].velocity = 127;
   oscillators[0].channel = 0;
-  oscillators[0].freq = frequencies[oscillators[0].note];
+  oscillators[0].freq = frequencies_rad[note]/SR;
+
+  if (debug) fprintf(stderr, "midigen: playing note: i:%-3i f:%5.2f\n", 
+					 note, frequencies_hz[note]);
 
   while ( 1 ) {
 
@@ -122,6 +135,8 @@ int main(int argc, char** argv) {
 	// write output
 	fwrite(&output, 1, 1, stdout);
   }
+
+  print_epilogue();
 
   return 0;
 }
