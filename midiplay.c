@@ -67,6 +67,10 @@ static int           bpm = 120;
 static int           samples_per_tick;
 static midi_header_t midi_header;
 static long          absolute_time = 0;
+static unsigned int selected_channels = 0;
+static unsigned int selected_tracks = 0;
+
+
 static byte_t* read_var_length(byte_t* ptr, unsigned long* result);
 static int get_free_osc();
 
@@ -150,6 +154,7 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
   byte_t eventType;
   byte_t channel;
   byte_t par1=0, par2=0;
+  unsigned long tempo;
   int osc;
 
   if ( debug > 1 ) fprintf (stderr, "process event at %p\n", ptr);
@@ -175,8 +180,13 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
 	  hdr->done = 1;
 	  break;
 	case 0x51: // set tempo
-	  bpm = 60000000.0/(((ptr[0]<<16)|(ptr[1]<<8)|(ptr[2]))); 
-	  samples_per_tick = 0.5 * SR * (bpm/60.0) / (float)midi_header.timeDivision;  
+	  assert (length == 3);
+	  tempo = (((ptr[0]<<16)|(ptr[1]<<8)|(ptr[2]))); 
+	  bpm = 60000000.0/ (float)tempo;
+	  samples_per_tick = samples_per_midi_tick(SR,bpm,midi_header.timeDivision);
+	  fprintf(stderr, 
+			  "new bpm: %d, par1:%d samples_per_tick:%d div:%d length:%d\n", 
+			  bpm, tempo, samples_per_tick, length, midi_header.timeDivision);
 	  break;
 	} 
 
@@ -212,6 +222,10 @@ static byte_t* process_event(track_header_t* hdr, byte_t* ptr) {
 								  absolute_time, channel, par1);
 	  break;
  	case 0x9: // note on
+
+	  // channel globally selected?
+	  if ( ( (1 << channel) & selected_channels ) == 0 ) break;
+
 	  if ( par2 != 0 ) {
 		osc = get_free_osc();
 		if (osc != -1) {
@@ -262,12 +276,7 @@ static void process_next_event_for_track(track_header_t* hdr) {
 
   byte_t* ptr = hdr->nextEvent;
 
-  if ( debug > 3 ) fprintf(stderr, "process next event for track\n");
-
   if ( hdr->decrementedDiffTime == 0 ) {
-
-	if ( debug > 2 ) fprintf(stderr, "process next event for track, difftime = 0\n");
-
 
 	ptr = process_event(hdr, ptr);
 
@@ -286,7 +295,7 @@ static void process_next_event_for_track(track_header_t* hdr) {
 static void calculate_frequencies() {
   int i;
   for ( i = 0; i<128; i++ ) {
-	frequencies[i] = 2.0*6.283185*(440.0/32.0) * pow(2.0, (float)(i-9)/12.0) / SR;
+	frequencies[i] = midi_note_to_radians_per_sample(SR, i);
   }
 }
 
@@ -301,8 +310,9 @@ static byte_t process_osc(oscillator_t* osc) {
   float f = 0.2*
 	channel_volume[osc->channel] *
 	(float)osc->velocity * 
-	sinf(osc->freq * (osc->t++));
+	sinf(osc->freq * osc->t);
 
+  osc->t++;
   return f;
 }
 
@@ -316,7 +326,12 @@ static int get_free_osc() {
 }
 
 static void usage() {
-  fprintf(stderr, "usage: midiplay [-p] [-d] midifile\n");
+  fprintf(stderr, 
+		  "usage: midiplay OPTIONS midifile\n"
+		  "[-p]    print notes\n"
+		  "[-d]    increase debug level\n"
+		  "{-c channel} process channels only 1..\n"
+		  "{-t track} process tracks only 1..\n");
   abort();
 }
 
@@ -329,12 +344,24 @@ int main(int argc, char** argv) {
   int done;
   int c;
 
-  while ( (c=getopt(argc, argv, "dp")) != -1) 
+  while ( (c=getopt(argc, argv, "dpc:t:")) != -1) 
 	switch(c) {
 	case 'd': debug ++; break;
 	case 'p': print_notes = 1; break;
+	case 'c': selected_channels |= 1<< (atoi(optarg)-1); break;
+	case 't': selected_tracks |= 1<< (atoi(optarg)-1); break;
 	default: usage();
 	}
+
+  if ( selected_channels == 0 ) 
+	selected_channels = 0xffffffff;
+
+  if ( selected_tracks == 0 ) 
+	selected_tracks = 0xffffffff;
+  
+  if ( debug > 0 ) 
+	fprintf(stderr, "selected channels: 0x%04x tracks:0x%08x\n", 
+			selected_channels, selected_tracks);
 
   if (argc == optind)
 	die("usage: midi midifile");
@@ -364,7 +391,7 @@ int main(int argc, char** argv) {
   fclose(midi_file);
   midi_file = NULL;
 
-  samples_per_tick = SR * (bpm/60) / midi_header.timeDivision;  
+  samples_per_tick = samples_per_midi_tick(SR,bpm,midi_header.timeDivision);  
   calculate_frequencies();
   init_osc();
 
@@ -376,7 +403,7 @@ int main(int argc, char** argv) {
 	absolute_time ++;
 
 	// midi events ready?
-	if (sample_count++ == samples_per_tick) {
+	if (sample_count == samples_per_tick) {
 
 	  if ( debug > 2 ) 
 		fprintf(stderr, "processing next sample samples_per_tick=%d\n", 
@@ -386,9 +413,9 @@ int main(int argc, char** argv) {
 
 	  done = 0;
 	  for (i = 0; i< midi_header.numberOfTracks; i++ ) {
-		if ( !track_headers[i].done ) {
+		if ( !track_headers[i].done && (1<<i) & selected_tracks) {
 		  
-		  if ( debug > 1 ) fprintf(stderr, "(%ld) processing track:%d\n", 
+		  if ( debug > 3 ) fprintf(stderr, "(%ld) processing track:%d\n", 
 								   absolute_time, i);
 
 		  process_next_event_for_track(track_headers + i );
@@ -399,6 +426,8 @@ int main(int argc, char** argv) {
 	  // no more active tracks...
 	  if ( done == 0 ) break;
 	}
+
+	sample_count ++;
 
 	// calculate output
 	output = 128;

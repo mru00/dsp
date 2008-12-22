@@ -40,6 +40,7 @@ typedef word_t buffer_t;
 #endif
 
 static const double pi = 3.1415;
+static const double sec_per_min = 60.0;
 
 
 extern void die(const char* msg);
@@ -62,11 +63,31 @@ static inline dword_t reorder_dword(dword_t in) {
   return (reorder_word((in >> 16)&0xffff)) | (reorder_word(in&0xffff)<<16);
 }
 
-static inline double midi_note_to_herz(int note) {
-  return (440.0/32.0) * pow(2.0, (double)(note-9)/12.0);
+static inline double 
+midi_note_to_hertz(int note) {
+  // i have no idea where the 2* comes from
+  return 2*(440.0/32.0) * pow(2.0, (double)(note-9)/12.0);
 }
 
-
-static inline double herz_to_radians(double herz) {
-  return herz * 2.0 * pi;
+static inline double 
+hertz_to_radians_per_sec(double hertz) {
+  return 2.0 * hertz * pi;
 }
+
+static inline double 
+radians_per_sec_to_radians_per_sample(double SR, double radians) {
+  return radians/SR;
+}
+
+static inline double 
+midi_note_to_radians_per_sample(double SR, int note) {
+  double r = midi_note_to_hertz(note);
+  r = hertz_to_radians_per_sec(r);
+  return radians_per_sec_to_radians_per_sample(SR, r);
+}
+
+static inline unsigned int 
+samples_per_midi_tick(unsigned SR, double bpm, double timeDivision) {
+  return SR * sec_per_min / (bpm * timeDivision);
+}
+

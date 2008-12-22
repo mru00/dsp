@@ -3,13 +3,24 @@
 ##
 
 
+## DEBUG
+#CFLAGS += -g -ggdb
 
-#DEBUG = -g -ggdb
-DEBUG = -O3
+## OPTIMIZE
+CFLAGS += -O3                        
 
+## GPROF
+CFLAGS += -pg                             
 
-CFLAGS += $(DEBUG) -std=c99 -Wall  -D_XOPEN_SOURCE=600 # -pg
-LDFLAGS += -lm common.o # -lefence
+## GCOV
+#CFLAGS += -fprofile-arcs -ftest-coverage   
+
+CFLAGS += $(DEBUG) -std=c99 -Wall -D_XOPEN_SOURCE=600 
+
+## ELECTRIC FENCE
+#LDFLAGS += -lefence                       
+
+LDFLAGS += -lm common.o
 
 
 SRC = convolve.c  vocoder.c synth.c synth2.c song.c \
@@ -34,9 +45,6 @@ hist: LDFLAGS += `pkg-config --libs gtk+-2.0` -lrfftw -lfftw \
 hist: CFLAGS += `pkg-config --cflags gtk+-2.0`
 
 
-ETAGS: $(SRC) $(HDR)
-	etags *.c *.h
-
 test2: convolve
 	sox mm.wav -1 -r 22050 -c 1 -t raw - | ./convolve tp.kernel | play -1 -r 22050 -c 1 -t raw -s  -
 
@@ -47,7 +55,7 @@ test4: convolve hist
 	sox mm.wav -1 -r 22050 -c 1 -t raw - | ./hist in | ./convolve hp.kernel | ./hist out | play -1 -r 22050 -c 1 -t raw -s  -
 
 clean:
-	rm -fv *.o *~ gmon.out
+	rm -fv *.o *~ gmon.out *.gcov *.gcda *.gcdo
 	rm -fv $(OBJ) $(BIN)
 
 arch: all
@@ -58,4 +66,12 @@ arch: all
 .PHONY: clean all test
 
 
+depend: Makefile
+	makedepend -- $(CFLAGS) -- $(SRC)
+
+TAGS:
+	etags $(SRC)
+
+
+## makedepend stuff:
 ##
