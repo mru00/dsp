@@ -173,19 +173,19 @@ get_power(int note) {
   double power = 0.0f;
 
   int p, c, j, k;
-  int buffer_index;
   int periodic = 2 * periodics[note];
+  double * buffer;
 
-  // z-transform
   c = p = 0;
   for ( j = 0; j < RINGBUFFERSIZE; j++ ) {
-	buffer_index = (current_buffer + j + 1) & RINGBUFFERMASK;
+	buffer = buffer_f[(current_buffer + j + 1) & RINGBUFFERMASK];
 	
+	// z-transform
 	for ( k = 0; k < N ; k++ ) {
-	  power_re += buffer_f[buffer_index][k] * cos_precalc[note][p++];
-	  power_im += buffer_f[buffer_index][k] * cos_precalc[note][p++];
-	  c ++;
-	  
+
+	  power_re += buffer[k] * cos_precalc[note][p++];
+	  power_im += buffer[k] * cos_precalc[note][p++];
+
 	  if ( p == periodic ) p = 0;
 	}
   }
@@ -193,7 +193,7 @@ get_power(int note) {
   // power = 20 log10 ( |power| )
   power = 10*absolute(power_re,power_im);
   power *= weighting_ELC[note];
-  power /= (double)c;
+  power /= (double)N*RINGBUFFERSIZE;
   power /= gain;
 
 
@@ -444,8 +444,8 @@ main(int argc, char** argv) {
   fprintf(stderr, 
 		  "\n"
 		  "finished.\n"
-		  " note_ons:%ld bytes_read:%ld\n", 
-		  stats_note_ons, bytes_read);
+		  " note_ons:%ld bytes_read:%ld playtime:%.2f[min]\n", 
+		  stats_note_ons, bytes_read, bytes_read/(SR*60.0));
 
 
   print_epilogue();

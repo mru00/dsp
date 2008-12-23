@@ -146,7 +146,7 @@ static void parse_event_data(track_header_t* hdr) {
 
   byte_t* ptr = hdr->eventData;
   unsigned long difftime;
-  byte_t status;
+  static byte_t status;
 
   while ( ptr < (hdr->eventData+hdr->chunkSize) ) {
 
