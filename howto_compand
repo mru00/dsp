@@ -1,0 +1,1 @@
+sox  -t raw -c 1 -1 -r 44100 -u moon.raw  -t raw -c 1 -1 -r 44100 -u moon2.raw compand 0.3,0.8 6:-80,-70,-30 0.1

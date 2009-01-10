@@ -1,0 +1,1 @@
+cat test.raw  | ./midimatch -N 512 -r 2 -k 10 -dh -g 1000 0

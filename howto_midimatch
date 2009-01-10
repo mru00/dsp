@@ -1,0 +1,1 @@
+./midiplay -p eminem-the_way_i_am.mid  2> out.midiplay| ./midimatch -dh  25 2> out.midimatch| ./play.sh 2> test.txt

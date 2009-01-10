@@ -1,0 +1,1 @@
+sox test.wav -t raw -c 1 -1 -r 44100 -u - vol 10 | ./midimatch -m 8 | ./midiplay -p - | ./play.sh 
