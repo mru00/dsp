@@ -1,4 +1,4 @@
-#include <rfftw.h>
+#include <fftw3.h>
 
 #include "common.h"
 

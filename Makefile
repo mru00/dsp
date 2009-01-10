@@ -4,27 +4,30 @@
 
 
 ## DEBUG
-#CFLAGS += -g -ggdb
+#FLAGS += -g -ggdb
 
 ## OPTIMIZE
-CFLAGS += -O3                        
+FLAGS += -O3
 
 ## GPROF
-#CFLAGS += -pg                             
+#FLAGS += -pg
 
 ## GCOV
-#CFLAGS += -fprofile-arcs -ftest-coverage   
-
-CFLAGS += $(DEBUG) -std=c99 -Wall -D_XOPEN_SOURCE=600 
+#FLAGS += --coverage
 
 ## ELECTRIC FENCE
-#LDFLAGS += -lefence                       
+#LDFLAGS += -lefence
 
-LDFLAGS += -lm common.o
+FFTW_CFLAGS = -include fftw3.h
+FFTW_LDFLAGS = -lfftw
 
+FLAGS += -std=c99 -Wall -D_XOPEN_SOURCE=600 -march=prescott
+CFLAGS += $(FLAGS) 
+
+LDFLAGS += $(FLAGS) -lm common.o
 
 SRC = convolve.c  vocoder.c synth.c synth2.c song.c \
-	bandpass.c midiplay.c midiparse.c midimatch.c midigen.c hist.c
+	bandpass.c midiplay.c midiparse.c midimatch.c midigen.c hist.c 
 BIN = $(SRC:.c=)
 OBJ = $(SRC:.c=.o)
 HDR = common.h
@@ -32,49 +35,47 @@ HDR = common.h
 
 all: $(BIN) $(ETAGS)
 
-$(SRC): common.o common.h Makefile
+flagcache: Makefile
+	@if [ "$(CFLAGS) $(LDFLAGS)" != "`cat flagcache`" ] ; then echo "$(CFLAGS) $(LDFLAGS)" > flagcache; fi
 
-bandpass: LDFLAGS += -lfftw -lrfftw
-song: LDFLAGS += -lfftw -lrfftw
-synth: LDFLAGS += -lfftw -lrfftw
-synth2: LDFLAGS += -lfftw -lrfftw
-vocoder: LDFLAGS += -lfftw -lrfftw
-hist: LDFLAGS += `pkg-config --libs gtk+-2.0` -lrfftw -lfftw \
-	`pkg-config --libs glib-2.0`  `pkg-config --libs gobject-2.0`\
+$(SRC): flagcache common.o common.h 
+common.o midifile.o input.o: flagcache
+
+
+bandpass song synth synth2 vocoder hist: LDFLAGS += -lfftw -lrfftw
+bandpass song synth synth2 vocoder hist: CFLAGS += $(FFTW_CFLAGS)
+
+
+hist: LDFLAGS += `pkg-config --libs gtk+-2.0` `pkg-config --libs glib-2.0`  `pkg-config --libs gobject-2.0`\
 	`pkg-config --libs gthread-2.0`
 hist: CFLAGS += `pkg-config --cflags gtk+-2.0`
 
+midimatch: LDFLAGS += -lasound
+midimatch: midifile.o input.o
 
-test2: convolve
-	sox mm.wav -1 -r 22050 -c 1 -t raw - | ./convolve tp.kernel | play -1 -r 22050 -c 1 -t raw -s  -
-
-test3: convolve
-	sox mm.wav -1 -r 22050 -c 1 -t raw - | ./convolve hp.kernel | play -1 -r 22050 -c 1 -t raw -s  -
-
-test4: convolve hist
-	sox mm.wav -1 -r 22050 -c 1 -t raw - | ./hist in | ./convolve hp.kernel | ./hist out | play -1 -r 22050 -c 1 -t raw -s  -
 
 clean:
 	rm -fv *.o *~ gmon.out *.gcov *.gcda *.gcdo
 	rm -fv $(OBJ) $(BIN)
 
-arch: all
+arch: 
 	tar cvzf digspeech.tar.gz cks.txt hp.kernel tp.kernel song.txt \
-		$(SRC) $(HDR) common.c play.sh Makefile eminem-the_way_i_am.mid README
+		$(SRC) $(HDR) common.c play.sh Makefile eminem-the_way_i_am.mid midifile.h midifile.c input.h input.c README
 
 
-.PHONY: clean all test
+.PHONY: clean all
 
 
 depend: Makefile
-	makedepend -- $(CFLAGS) -- $(SRC)
+	makedepend -- $(CFLAGS) -- $(SRC) $(HDR) common.c
 
 TAGS:
 	etags $(SRC)
 
 
 ## makedepend stuff:
-### DO NOT DELETE
+
+# DO NOT DELETE
 
 convolve.o: /usr/include/signal.h /usr/include/features.h
 convolve.o: /usr/include/sys/cdefs.h /usr/include/bits/wordsize.h
@@ -84,29 +85,31 @@ convolve.o: /usr/include/bits/typesizes.h /usr/include/bits/signum.h
 convolve.o: /usr/include/time.h /usr/include/bits/siginfo.h
 convolve.o: /usr/include/bits/sigaction.h /usr/include/bits/sigstack.h
 convolve.o: /usr/include/sys/ucontext.h /usr/include/bits/sigcontext.h
-convolve.o: /usr/include/asm/sigcontext.h /usr/include/bits/pthreadtypes.h
-convolve.o: /usr/include/bits/sigthread.h common.h /usr/include/stdio.h
-convolve.o: /usr/include/libio.h /usr/include/_G_config.h
-convolve.o: /usr/include/wchar.h /usr/include/bits/wchar.h
-convolve.o: /usr/include/gconv.h /usr/include/bits/stdio_lim.h
-convolve.o: /usr/include/bits/sys_errlist.h /usr/include/unistd.h
-convolve.o: /usr/include/bits/posix_opt.h /usr/include/bits/environments.h
-convolve.o: /usr/include/bits/confname.h /usr/include/getopt.h
-convolve.o: /usr/include/stdlib.h /usr/include/bits/waitflags.h
-convolve.o: /usr/include/bits/waitstatus.h /usr/include/sys/types.h
-convolve.o: /usr/include/math.h /usr/include/bits/huge_val.h
-convolve.o: /usr/include/bits/huge_valf.h /usr/include/bits/huge_vall.h
-convolve.o: /usr/include/bits/inf.h /usr/include/bits/nan.h
-convolve.o: /usr/include/bits/mathdef.h /usr/include/bits/mathcalls.h
-convolve.o: /usr/include/string.h /usr/include/assert.h
-vocoder.o: common.h /usr/include/stdio.h /usr/include/features.h
+convolve.o: /usr/include/asm/sigcontext.h /usr/include/asm/types.h
+convolve.o: /usr/include/asm-generic/int-ll64.h
+convolve.o: /usr/include/bits/pthreadtypes.h /usr/include/bits/sigthread.h
+convolve.o: common.h /usr/include/stdio.h /usr/include/libio.h
+convolve.o: /usr/include/_G_config.h /usr/include/wchar.h
+convolve.o: /usr/include/bits/wchar.h /usr/include/gconv.h
+convolve.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
+convolve.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+convolve.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
+convolve.o: /usr/include/getopt.h /usr/include/stdlib.h
+convolve.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
+convolve.o: /usr/include/sys/types.h /usr/include/math.h
+convolve.o: /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h
+convolve.o: /usr/include/bits/huge_vall.h /usr/include/bits/inf.h
+convolve.o: /usr/include/bits/nan.h /usr/include/bits/mathdef.h
+convolve.o: /usr/include/bits/mathcalls.h /usr/include/string.h
+convolve.o: /usr/include/assert.h
+vocoder.o: /usr/include/fftw3.h /usr/include/stdio.h /usr/include/features.h
 vocoder.o: /usr/include/sys/cdefs.h /usr/include/bits/wordsize.h
 vocoder.o: /usr/include/gnu/stubs.h /usr/include/gnu/stubs-32.h
 vocoder.o: /usr/include/bits/types.h /usr/include/bits/typesizes.h
 vocoder.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h
 vocoder.o: /usr/include/bits/wchar.h /usr/include/gconv.h
 vocoder.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
-vocoder.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+vocoder.o: common.h /usr/include/unistd.h /usr/include/bits/posix_opt.h
 vocoder.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
 vocoder.o: /usr/include/getopt.h /usr/include/stdlib.h
 vocoder.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
@@ -143,9 +146,11 @@ synth2.o: /usr/include/bits/typesizes.h /usr/include/bits/signum.h
 synth2.o: /usr/include/time.h /usr/include/bits/siginfo.h
 synth2.o: /usr/include/bits/sigaction.h /usr/include/bits/sigstack.h
 synth2.o: /usr/include/sys/ucontext.h /usr/include/bits/sigcontext.h
-synth2.o: /usr/include/asm/sigcontext.h /usr/include/bits/pthreadtypes.h
-synth2.o: /usr/include/bits/sigthread.h common.h /usr/include/stdio.h
-synth2.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h
+synth2.o: /usr/include/asm/sigcontext.h /usr/include/asm/types.h
+synth2.o: /usr/include/asm-generic/int-ll64.h
+synth2.o: /usr/include/bits/pthreadtypes.h /usr/include/bits/sigthread.h
+synth2.o: common.h /usr/include/stdio.h /usr/include/libio.h
+synth2.o: /usr/include/_G_config.h /usr/include/wchar.h
 synth2.o: /usr/include/bits/wchar.h /usr/include/gconv.h
 synth2.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
 synth2.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
@@ -184,21 +189,23 @@ bandpass.o: /usr/include/bits/typesizes.h /usr/include/bits/signum.h
 bandpass.o: /usr/include/time.h /usr/include/bits/siginfo.h
 bandpass.o: /usr/include/bits/sigaction.h /usr/include/bits/sigstack.h
 bandpass.o: /usr/include/sys/ucontext.h /usr/include/bits/sigcontext.h
-bandpass.o: /usr/include/asm/sigcontext.h /usr/include/bits/pthreadtypes.h
-bandpass.o: /usr/include/bits/sigthread.h common.h /usr/include/stdio.h
-bandpass.o: /usr/include/libio.h /usr/include/_G_config.h
-bandpass.o: /usr/include/wchar.h /usr/include/bits/wchar.h
-bandpass.o: /usr/include/gconv.h /usr/include/bits/stdio_lim.h
-bandpass.o: /usr/include/bits/sys_errlist.h /usr/include/unistd.h
-bandpass.o: /usr/include/bits/posix_opt.h /usr/include/bits/environments.h
-bandpass.o: /usr/include/bits/confname.h /usr/include/getopt.h
-bandpass.o: /usr/include/stdlib.h /usr/include/bits/waitflags.h
-bandpass.o: /usr/include/bits/waitstatus.h /usr/include/sys/types.h
-bandpass.o: /usr/include/math.h /usr/include/bits/huge_val.h
-bandpass.o: /usr/include/bits/huge_valf.h /usr/include/bits/huge_vall.h
-bandpass.o: /usr/include/bits/inf.h /usr/include/bits/nan.h
-bandpass.o: /usr/include/bits/mathdef.h /usr/include/bits/mathcalls.h
-bandpass.o: /usr/include/string.h /usr/include/assert.h
+bandpass.o: /usr/include/asm/sigcontext.h /usr/include/asm/types.h
+bandpass.o: /usr/include/asm-generic/int-ll64.h
+bandpass.o: /usr/include/bits/pthreadtypes.h /usr/include/bits/sigthread.h
+bandpass.o: common.h /usr/include/stdio.h /usr/include/libio.h
+bandpass.o: /usr/include/_G_config.h /usr/include/wchar.h
+bandpass.o: /usr/include/bits/wchar.h /usr/include/gconv.h
+bandpass.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
+bandpass.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+bandpass.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
+bandpass.o: /usr/include/getopt.h /usr/include/stdlib.h
+bandpass.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
+bandpass.o: /usr/include/sys/types.h /usr/include/math.h
+bandpass.o: /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h
+bandpass.o: /usr/include/bits/huge_vall.h /usr/include/bits/inf.h
+bandpass.o: /usr/include/bits/nan.h /usr/include/bits/mathdef.h
+bandpass.o: /usr/include/bits/mathcalls.h /usr/include/string.h
+bandpass.o: /usr/include/assert.h
 midiplay.o: /usr/include/getopt.h /usr/include/stdlib.h
 midiplay.o: /usr/include/features.h /usr/include/sys/cdefs.h
 midiplay.o: /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h
@@ -253,6 +260,24 @@ midimatch.o: /usr/include/bits/confname.h /usr/include/stdlib.h
 midimatch.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
 midimatch.o: /usr/include/sys/types.h /usr/include/time.h
 midimatch.o: /usr/include/bits/pthreadtypes.h /usr/include/assert.h
+midimatch.o: midifile.h input.h /usr/include/alsa/asoundlib.h
+midimatch.o: /usr/include/fcntl.h /usr/include/bits/fcntl.h
+midimatch.o: /usr/include/sys/stat.h /usr/include/bits/stat.h
+midimatch.o: /usr/include/endian.h /usr/include/bits/endian.h
+midimatch.o: /usr/include/sys/poll.h /usr/include/bits/poll.h
+midimatch.o: /usr/include/errno.h /usr/include/bits/errno.h
+midimatch.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+midimatch.o: /usr/include/asm-generic/errno.h
+midimatch.o: /usr/include/asm-generic/errno-base.h
+midimatch.o: /usr/include/alsa/asoundef.h /usr/include/alsa/version.h
+midimatch.o: /usr/include/alsa/global.h /usr/include/alsa/input.h
+midimatch.o: /usr/include/alsa/output.h /usr/include/alsa/error.h
+midimatch.o: /usr/include/alsa/conf.h /usr/include/alsa/pcm.h
+midimatch.o: /usr/include/alsa/rawmidi.h /usr/include/alsa/timer.h
+midimatch.o: /usr/include/alsa/hwdep.h /usr/include/alsa/control.h
+midimatch.o: /usr/include/alsa/mixer.h /usr/include/alsa/seq_event.h
+midimatch.o: /usr/include/alsa/seq.h /usr/include/alsa/seqmid.h
+midimatch.o: /usr/include/alsa/seq_midi_event.h
 midigen.o: /usr/include/getopt.h /usr/include/stdlib.h
 midigen.o: /usr/include/features.h /usr/include/sys/cdefs.h
 midigen.o: /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h
@@ -281,6 +306,7 @@ hist.o: /usr/include/bits/sigset.h /usr/include/bits/signum.h
 hist.o: /usr/include/bits/siginfo.h /usr/include/bits/sigaction.h
 hist.o: /usr/include/bits/sigstack.h /usr/include/sys/ucontext.h
 hist.o: /usr/include/bits/sigcontext.h /usr/include/asm/sigcontext.h
+hist.o: /usr/include/asm/types.h /usr/include/asm-generic/int-ll64.h
 hist.o: /usr/include/bits/pthreadtypes.h /usr/include/bits/sigthread.h
 hist.o: /usr/include/bits/setjmp.h common.h /usr/include/stdio.h
 hist.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h
@@ -296,3 +322,39 @@ hist.o: /usr/include/bits/huge_vall.h /usr/include/bits/inf.h
 hist.o: /usr/include/bits/nan.h /usr/include/bits/mathdef.h
 hist.o: /usr/include/bits/mathcalls.h /usr/include/string.h
 hist.o: /usr/include/assert.h
+common.o: /usr/include/stdio.h /usr/include/features.h
+common.o: /usr/include/sys/cdefs.h /usr/include/bits/wordsize.h
+common.o: /usr/include/gnu/stubs.h /usr/include/gnu/stubs-32.h
+common.o: /usr/include/bits/types.h /usr/include/bits/typesizes.h
+common.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h
+common.o: /usr/include/bits/wchar.h /usr/include/gconv.h
+common.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
+common.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+common.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
+common.o: /usr/include/getopt.h /usr/include/stdlib.h
+common.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
+common.o: /usr/include/sys/types.h /usr/include/time.h
+common.o: /usr/include/bits/pthreadtypes.h /usr/include/math.h
+common.o: /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h
+common.o: /usr/include/bits/huge_vall.h /usr/include/bits/inf.h
+common.o: /usr/include/bits/nan.h /usr/include/bits/mathdef.h
+common.o: /usr/include/bits/mathcalls.h /usr/include/string.h
+common.o: /usr/include/assert.h
+common.o: common.h /usr/include/stdio.h /usr/include/features.h
+common.o: /usr/include/sys/cdefs.h /usr/include/bits/wordsize.h
+common.o: /usr/include/gnu/stubs.h /usr/include/gnu/stubs-32.h
+common.o: /usr/include/bits/types.h /usr/include/bits/typesizes.h
+common.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h
+common.o: /usr/include/bits/wchar.h /usr/include/gconv.h
+common.o: /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h
+common.o: /usr/include/unistd.h /usr/include/bits/posix_opt.h
+common.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
+common.o: /usr/include/getopt.h /usr/include/stdlib.h
+common.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
+common.o: /usr/include/sys/types.h /usr/include/time.h
+common.o: /usr/include/bits/pthreadtypes.h /usr/include/math.h
+common.o: /usr/include/bits/huge_val.h /usr/include/bits/huge_valf.h
+common.o: /usr/include/bits/huge_vall.h /usr/include/bits/inf.h
+common.o: /usr/include/bits/nan.h /usr/include/bits/mathdef.h
+common.o: /usr/include/bits/mathcalls.h /usr/include/string.h
+common.o: /usr/include/assert.h

@@ -19,6 +19,10 @@
 #define SAMPLE_SIZE 1
 
 
+#define min(x,y) ((x)<(y)?(x):(y))
+#define absolute(x,y) sqrt( (x)*(x) + (y)*(y) )
+
+
 /* #define SAMPLE_SIZE 1 */
 /* #define SR 44100 */
 /* #define NF (float)N */
