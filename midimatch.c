@@ -322,6 +322,7 @@ main(int argc, char** argv) {
   int samples_per_tick;
   div_t rest;
   buffer_t* buffer;
+  rdfun input_read;
 
   while ( ( c = getopt(argc, argv, "vphN:o:g:k:r:c:lS:t:") ) != -1) 
 	switch (c) {
@@ -350,13 +351,16 @@ main(int argc, char** argv) {
 
   print_prologoue(N, SR);
 
-  buffer = input_open("stdin", N);
+  input_read = input_open("alsa:default");
 
   // allocate buffers
 
   buffer_f = (real_t**)malloc ( RINGBUFFERSIZE * sizeof(real_t*) );
-  for ( j = 0; j < RINGBUFFERSIZE; j++ )
+  for ( j = 0; j < RINGBUFFERSIZE; j++ ) {
 	buffer_f[j] = malloc ( N * sizeof(real_t) );
+	for ( i = 0; i < N ; i ++ )
+	  buffer_f[j][i] = 0.0;
+  }
 
 
   // prepare midi file
@@ -376,7 +380,7 @@ main(int argc, char** argv) {
   rest.rem = 0;
 
   // process data
-  while ( (rd = read(0, buffer_f[current_buffer], N*sizeof(real_t))) ) { 
+  while ( (rd = input_read(buffer_f[current_buffer], N)) ) { 
 
 	bytes_read += rd;
 
@@ -388,8 +392,8 @@ main(int argc, char** argv) {
 
 	absolute_time += N;
 
-	if ( use_local_maximum ) scan_freqs_v2();
-	else scan_freqs();
+ 	if ( use_local_maximum ) scan_freqs_v2(); 
+ 	else scan_freqs(); 
 
 	current_buffer = (current_buffer+1) & RINGBUFFERMASK;
   }
