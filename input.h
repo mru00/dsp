@@ -1,13 +1,10 @@
 #pragma once
 
 
-typedef size_t (*rdfun)(buffer_t* buffer, const size_t size);
+typedef size_t (*rdfun)(float* buffer, const size_t size);
 
-extern buffer_t*
-input_open(const char* which, const size_t size);
-
-extern int
-input_read();
+extern rdfun
+input_open(const char* which);
 
 extern void
 input_close();
