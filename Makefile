@@ -15,6 +15,7 @@ FLAGS += -O3
 ## GCOV
 #FLAGS += --coverage
 
+
 ## ELECTRIC FENCE
 #LDFLAGS += -lefence
 
@@ -24,6 +25,8 @@ FFTW_LDFLAGS = -lfftw
 FLAGS += -std=c99 -Wall -D_XOPEN_SOURCE=600 -march=prescott
 CFLAGS += $(FLAGS) 
 
+ASSEMBLE.c = $(CC) -S $(CFLAGS)
+
 LDFLAGS += $(FLAGS) -lm common.o
 
 SRC = convolve.c  vocoder.c synth.c synth2.c song.c \
@@ -32,11 +35,13 @@ BIN = $(SRC:.c=)
 OBJ = $(SRC:.c=.o)
 HDR = common.h
 
+# for the flag cache
+FG = $(CFLAGS) $(LDFLAGS)
 
 all: $(BIN) $(ETAGS)
 
 flagcache: Makefile
-	@if [ "$(CFLAGS) $(LDFLAGS)" != "`cat flagcache`" ] ; then echo "$(CFLAGS) $(LDFLAGS)" > flagcache; fi
+	@if [ "$(FG)" != "$(shell cat flagcache)" ] ; then echo "$(FG)" > flagcache; fi
 
 $(SRC): flagcache common.o common.h 
 common.o midifile.o input.o: flagcache
@@ -46,31 +51,41 @@ bandpass song synth synth2 vocoder hist: LDFLAGS += -lfftw -lrfftw
 bandpass song synth synth2 vocoder hist: CFLAGS += $(FFTW_CFLAGS)
 
 
-hist: LDFLAGS += `pkg-config --libs gtk+-2.0` `pkg-config --libs glib-2.0`  `pkg-config --libs gobject-2.0`\
-	`pkg-config --libs gthread-2.0`
-hist: CFLAGS += `pkg-config --cflags gtk+-2.0`
+hist: LDFLAGS += $(shell pkg-config --libs gtk+-2.0 glib-2.0 gobject-2.0 gthread-2.0)
+hist: CFLAGS += $(shell pkg-config --cflags gtk+-2.0)
 
 midimatch: LDFLAGS += -lasound
 midimatch: midifile.o input.o
 
+%.s: %.c
+	$(ASSEMBLE.c) $< > $@
 
-clean:
-	rm -fv *.o *~ gmon.out *.gcov *.gcda *.gcdo
-	rm -fv $(OBJ) $(BIN)
+
+clean.gcov:
+	-rm -v gmon.out *.gcov *.gcda *.gcdo
+
+clean: clean.gcov
+	-rm -v *.o *~ gmon.out *.gcov *.gcda *.gcdo
+	-rm -v $(OBJ) $(BIN)
 
 arch: 
 	tar cvzf digspeech.tar.gz cks.txt hp.kernel tp.kernel song.txt \
-		$(SRC) $(HDR) common.c play.sh Makefile eminem-the_way_i_am.mid midifile.h midifile.c input.h input.c README
+		$(SRC) $(HDR) common.c play.sh Makefile eminem-the_way_i_am.mid \
+		midifile.h midifile.c input.h input.c README
 
 
-.PHONY: clean all
-
+testmidi: midimatch
+	$(MAKE) -C testmidi 
 
 depend: Makefile
 	makedepend -- $(CFLAGS) -- $(SRC) $(HDR) common.c
 
 TAGS:
 	etags $(SRC)
+
+
+
+.PHONY: clean all depend arch clean.gcov testmidi
 
 
 ## makedepend stuff:
